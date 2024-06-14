@@ -1,5 +1,5 @@
-<<<<<<< HEAD
-"# Tic-Tac-Toe" 
-=======
-# Tic-Tac-Toe
->>>>>>> 70922a1dcb0ac8623e769f9b409377dea11a1549
+Tic-Tac-Toe done by me: https://www.linkedin.com/in/adrian-alamu-870688293/
+
+Uses Java with TCP/IP socket. Just click run and see terminal for which port it's running on. Should be at localhost:8080.
+
+Has SinglePlayer, MultiPlayer, Chat, Auth, SignOut
