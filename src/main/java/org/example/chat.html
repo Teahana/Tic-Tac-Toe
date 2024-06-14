@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #sidebar {
+            width: 30%;
+            float: left;
+            padding: 10px;
+        }
+        #chatbox {
+            width: 70%;
+            float: right;
+            padding: 10px;
+        }
+        .chat-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .chat-list li {
+            cursor: pointer;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            position: relative;
+            padding-left: 34px;
+        }
+        .chat-list li:before {
+            content: "👤"; /* Generic user icon */
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .message-window {
+            width: 100%;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        .message-input {
+            width: calc(100% - 20px);
+            padding: 10px;
+        }
+        .button {
+            padding: 10px 20px;
+            margin: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div id="sidebar">
+    <button class="button" onclick="backToMenu()">Back to Menu</button>
+    <button class="button" onclick="fetchUsers()">Refresh User List</button>
+    <ul id="userList" class="chat-list">
+        <!-- User list will be populated here -->
+    </ul>
+</div>
+<div id="chatbox">
+    <!-- Placeholder for dynamically added chat windows -->
+</div>
+<script>
+    let chatWindows = {}; // Object to keep track of created chat windows
+    let currentChatUser = null;
+    let userName = null;
+    window.onload = function() {
+        const cookie = getCookie('new');
+        userName = cookie;
+        console.log('cookie: ' + cookie)
+        console.log('WINDOWS LOADED!')
+        fetchUsers().then(() => {
+            console.log('Polling called');
+           return pollForMessages();
+
+        }).catch(error => {
+            console.error('An error occurred:', error);
+        });
+    };
+    function fetchUsers() {
+        return fetch('/getAllUsers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: userName
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.statusText);
+                }
+                return response.text();
+            })
+            .then(userListText => {
+                const users = userListText.split(',').map(user => user.trim()); // Split the list by commas and trim
+                if(users){
+                    const userListElement = document.getElementById('userList');
+                    userListElement.innerHTML = ''; // Optionally clear existing user list UI
+                    users.forEach(user => {
+                        if (!chatWindows[user]) { // Check if chat window for this user already exists
+                            createChatWindow(user); // Create chat window if it doesn't exist
+                        }
+                        // Add user to the sidebar user list
+                        const userItem = document.createElement('li');
+                        userItem.textContent = user;
+                        userItem.onclick = () => openChat(user);
+                        userListElement.appendChild(userItem);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('There has been a problem with your fetch operation:', error);
+            });
+    }
+    function openChat(username) {
+        // Hide all chat windows
+        Object.values(chatWindows).forEach(window => {
+            window.parentNode.style.display = 'none';
+        });
+        // Show the current user's chat window
+        if (chatWindows[username]) {
+            chatWindows[username].parentNode.style.display = 'block';
+        } else {
+            createChatWindow(username);
+            chatWindows[username].parentNode.style.display = 'block';
+        }
+        currentChatUser = username; // Set the current chat user
+    }
+    function createChatWindow(username) {
+        const chatContainer = document.createElement('div');
+        chatContainer.id = 'chat_' + username;
+        chatContainer.style.display = 'none'; // Initially hide the chat window
+        chatContainer.innerHTML = `
+        <h3>Chat with ${username}</h3>
+        <div class='message-window' id='messages_${username}'></div>
+        <input type="text" id="messageInput_${username}" class="message-input" placeholder="Type a message...">
+        <button onclick="sendMessage('${username}')" class="button">Send</button>
+    `;
+        document.getElementById('chatbox').appendChild(chatContainer);
+        chatWindows[username] = document.getElementById('messages_' + username);
+        chatWindows[username].innerHTML = localStorage.getItem(username) || '<p>No messages yet!</p>'; // Load stored messages or default text
+    }
+
+    function sendMessage() {
+        const messageInput = document.getElementById('messageInput_' + currentChatUser);
+        const message = messageInput.value.trim();
+        messageInput.value = '';
+
+        if (!message || !currentChatUser) { // Check if the message is empty or no user is selected
+            console.error('No message to send or no user selected.');
+            return; // Do not proceed further if there's no message or no user selected
+        }
+
+        console.log(`Sending message to ${currentChatUser}: ${message}`);
+        fetch('/sendMessage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: `${userName}|${currentChatUser}|${message}` // Send the username and message separated by |
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                console.log('MESSAGE SENT!')
+                appendMessage('You',message);
+                pollForMessages();
+            })
+            .catch(error => {
+                window.location.reload();
+                console.error('Failed to send message:', error);
+            });
+    }
+    function pollForMessages() {
+        console.log('polling called!')
+        if (currentChatUser) {
+            fetch('/getMessage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: userName
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.statusText);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    if (data) {
+                        const [username, message] = data.split('|'); // Split the received data into username and message
+                        if (username && message) {
+                            appendMessage(username, message); // Append the message to the chat window
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to poll for messages:', error);
+                    // Handle the error as needed
+                })
+                .finally(() => {
+                    // Schedule the next poll after 1 second
+                    setTimeout(pollForMessages, 1000);
+                });
+        } else {
+            // If no currentChatUser, schedule to check again after 1 second
+            setTimeout(pollForMessages, 1000);
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    function appendMessage(username, message) {
+        if (!chatWindows[username]) {
+            createChatWindow(username);
+        }
+        const messageElement = document.createElement('p');
+        if(username === 'You'){
+            messageElement.innerHTML = `<strong>You:</strong> ${message}`;
+            username = currentChatUser;
+        }
+        else{
+            messageElement.innerHTML = `<strong>${username}:</strong> ${message}`;
+        }
+        chatWindows[username].appendChild(messageElement);
+        chatWindows[username].scrollTop = chatWindows[username].scrollHeight; // Scroll to the latest message
+        // Update local storage
+        localStorage.setItem(username, chatWindows[username].innerHTML);
+    }
+    function backToMenu() {
+        fetch('/getMenu', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: ''
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.statusText);
+                }
+                return response.text();
+            })
+            .then(menuLink => {
+                window.location.replace(menuLink);
+            })
+            .catch(error => {
+                console.error('Failed to return to menu:', error);
+            });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic-Tac-Toe Game</title>
+  <style>
+    * {
+      color: white;
+      font-family: sans-serif;
+      transition: 0.2s ease-in-out;
+      user-select: none;
+    }
+
+    .align {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    body {
+      background-color: #252a34;
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      text-align: center;
+      padding-top: 5vh;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 10px;
+      height: 250px;
+      width: 250px;
+      margin: 30px auto;
+      border: 2px solid #000;
+    }
+
+    .board button {
+      cursor: pointer;
+      font-size: 2rem;
+      font-weight: 700;
+      border: 2px solid #000;
+      background: none;
+    }
+
+    .board button:hover {
+      background-color: #ff2e63;
+    }
+
+    .board button.disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+
+    #gameResult {
+      text-align: center;
+      font-size: 24px;
+      color: #D8000C;
+      background-color: #FFD2D2;
+      padding: 10px;
+      margin: 20px auto;
+      width: 60%;
+      border-radius: 5px;
+      display: none; /* Initially hidden */
+    }
+    #opponentLeft {
+      text-align: center;
+      font-size: 24px;
+      color: #d80000;
+      background-color: #FFD2D2;
+      padding: 10px;
+      margin: 20px auto;
+      width: 60%;
+      border-radius: 5px;
+      display: none; /* Initially hidden */
+    }
+
+    #turnInfo {
+      text-align: center;
+      margin: 20px 0;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .rematch-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100px;
+      margin: 20px 0;
+    }
+
+
+    #rematchButton {
+      background-color: #ff2e63;
+      color: white;
+      padding: 10px 25px;
+      border: none;
+      font-size: 1.2rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    #rematchButton:hover {
+      background-color: #08d9d6;
+      color: #000;
+    }
+
+    #rematchButton.loading {
+      cursor: default;
+      opacity: 0.75;
+    }
+
+    #rematchButton:disabled {
+      background-color: grey;
+      cursor: not-allowed;
+    }
+    #menuButton {
+      background-color: #35ff2e;
+      color: white;
+      padding: 10px 25px;
+      border: none;
+      font-size: 1.2rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+  </style>
+</head>
+<body>
+<div id="turnInfo">It's your turn!</div> <!-- Turn information label -->
+<div class="board">
+  <!-- Adding the 'align' class for centering the text -->
+  <button class="align" value="1"></button>
+  <button class="align" value="2"></button>
+  <button class="align" value="3"></button>
+  <button class="align" value="4"></button>
+  <button class="align" value="5"></button>
+  <button class="align" value="6"></button>
+  <button class="align" value="7"></button>
+  <button class="align" value="8"></button>
+  <button class="align" value="9"></button>
+</div>
+<div id="gameResult"></div> <!-- Game result label -->
+<div id="opponentLeft"></div> <!-- Opponent Left label -->
+<div id="rematchButtonContainer" class="rematch-container">
+  <button id="rematchButton" style="display: none;">Rematch?</button>
+  <button id="menuButton" style="display: block;">Menu</button>
+
+</div>
+<script>
+  var opponentsName;
+  var myName;
+  //To see if its multiplayer or single player
+  var gameMode;
+  // Global variable to keep track of the polling interval
+  var pollingInterval = null;
+  //Variables to store your letter and opponents letter based on servers response
+  var myLetter,opponentLetter;
+  // Sending request upon page load to get players turn
+  window.onload = () => {
+    const cookie = getCookie('new');
+    console.log('Cookie: ' + cookie)
+    //Setting your name based off the cookie
+    myName = getCookie("new");
+    console.log('window onload was called')
+    //To get turn when game first loads
+    fetch('/getTurn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'check'  // Just a dummy body
+    })
+            .then(response => response.text())
+            .then(data => {
+              const responseParts = data.split(',');
+              const myTurn = responseParts[0];  // To extract WINNER OR LOSER OR DRAW
+              console.log(myTurn)
+              opponentsName = responseParts[1]; // Extract the move made to update the button
+              gameMode = responseParts[2];
+              const move = responseParts[3];
+              //If your turn
+              if (myTurn === "1") {
+                console.log("It's your turn!");
+                myLetter = 'X';
+                opponentLetter = 'O';
+                setButtonsEnabled(true);
+                updateTurnDisplay(true);
+              }
+              //else Not your turn
+              else {
+                myLetter = 'O';
+                opponentLetter = 'X';
+                console.log("Not your turn yet!");
+                setButtonsEnabled(false);
+                updateTurnDisplay(false);
+                if(gameMode === 'single'){
+                  setTimeout(() => {
+                    updateBoardButtons(move,opponentLetter);
+                    updateTurnDisplay(true);
+                    setButtonsEnabled(true);
+                  }, 2000);
+                }
+                else if(gameMode === 'mult'){
+                  pollForTurnChange();
+                }
+              }
+            })
+            .catch(error => {
+              console.error('Error checking turn:', error);
+              setButtonsEnabled(false);  // Disable buttons if error occurs
+            });
+  };
+  // Adds event listeners to all buttons on the board
+  document.querySelectorAll('.board button').forEach(button => {
+    button.addEventListener('click', (e) => {
+      if (!button.disabled) {  // Check if button is not disabled
+        const position = e.target.value;
+        fetch('/makeMove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: position
+        })
+                .then(response => response.text())
+                .then(data => {
+                  if(data === 'playerLeft'){
+                    displayOpponentLeft();
+                    return;
+                  }
+                  const responseParts = data.split(',');
+                  console.log('data: ' + data)
+                  const status = responseParts[0];  // To extract WINNER OR LOSER OR DRAW
+                  const move = responseParts[1]; // Extract the move made to update the button
+                  if (status === "WINNER") {
+                    showGameResult("You won! You got 5 seconds to request rematch");
+                    updateBoardButtons(move, myLetter);  // Update the button immediately
+                    setButtonsEnabled(false);
+                    //stopPolling();
+                    //startPolling();
+                    return;
+                  } else if (status === "DRAW") {
+                    if(gameMode ==='single'){
+                      console.log(move)
+                      if(move === position){
+                        updateBoardButtons(position,myLetter);
+                      }
+                      else{
+                        updateBoardButtons(move,opponentLetter);
+                      }
+                      setButtonsEnabled(false);
+                    }
+                    else{
+                      updateBoardButtons(move, myLetter);  // Update the button immediately
+                      setButtonsEnabled(false);
+                    }
+                    showGameResult("ITS A DRAW! YOU GOT 5 SECONDS TO REQUEST REMATCH")
+                    return;
+                  }
+                  else if(status === 'LOSER'){
+                    if(gameMode ==='single'){
+                      updateBoardButtons(position,myLetter);
+                      updateBoardButtons(move,opponentLetter);
+                      setButtonsEnabled(false);
+                    }
+                    else{
+                      updateBoardButtons(move, myLetter);  // Update the button immediately
+                      setButtonsEnabled(false);
+                    }
+                    showGameResult("YOU LOST! YOU GOT 5 SECONDS TO REQUEST REMATCH")
+                  }
+                  if(gameMode === 'mult'){
+                    pollForTurnChange();
+                    console.log('button chosen was: ' + move)
+                    setButtonsEnabled(false);
+                    updateBoardButtons(move,myLetter);
+                    updateTurnDisplay(false);
+                  }
+                  else{
+                    updateTurnDisplay(false);
+                    updateBoardButtons(position,myLetter)
+                    setButtonsEnabled(false);
+                    //Setting a timer before displaying computer's move to make it more real
+                    setTimeout(() => {
+                      setButtonsEnabled(true);
+                      updateTurnDisplay(true);
+                      updateBoardButtons(data,opponentLetter);
+                      console.log('data' + data)
+                    }, 2000);
+                  }
+
+                })
+                .catch(error => {
+                  console.error('Error:', error);
+                });
+      }
+    });
+  });
+  function startPolling() {
+    if (pollingInterval === null) {  // Check if polling is not already started
+      pollingInterval = setInterval(pollForTurnChange, 100);  // Start polling every 1 second
+    }
+  }
+  //For stopping the polling
+  function stopPolling() {
+    if (pollingInterval !== null) {
+      clearInterval(pollingInterval);  // Stop the polling
+      pollingInterval = null;  // Reset the interval ID
+    }
+  }
+  //Polling function to receive update
+  function pollForTurnChange() {
+    console.log("Waiting for update...");
+    fetch('/getUpdate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'waiting for move'
+    })
+            .then(response => response.text())
+            .then(data => {
+              if (data === 'playerLeft') {
+                displayOpponentLeft();
+                stopPolling();  // Stop polling since the game is over
+                return;
+              }
+              const responseParts = data.split(',');
+              const status = responseParts[0];  // to extract WINNER, LOSER, or DRAW
+              const move = responseParts[1];
+              //This might not happen since you cant win if youre waiting for update but just leaving it here just incase
+              if (status === "WINNER") {
+                showGameResult("You Won! You got 5 seconds to request rematch");
+                updateBoardButtons(move, opponentLetter);
+                setButtonsEnabled(false);
+                return;
+              } else if (status === "LOSER") {
+                showGameResult("You Lost! You got 5 seconds to request rematch");
+                updateBoardButtons(move, opponentLetter);
+                setButtonsEnabled(false);
+                return;
+              } else if (status === "DRAW") {
+                showGameResult("It's a draw! You got 5 seconds to request rematch");
+                updateBoardButtons(move, opponentLetter);
+                setButtonsEnabled(false);
+                return;
+              }
+              //stopPolling();
+              console.log(`Update received: Position ${move} has been played.`);
+              updateBoardButtons(move, opponentLetter);  // Update the board state
+              setButtonsEnabled(true);  //Enabele your button now since you're received any update meaning its your turn now
+              updateTurnDisplay(true);  // Update display to show it's your turn
+            })
+            .catch(error => {
+              console.error('Error while waiting for update:', error);
+              //setTimeout(pollForTurnChange, 5000);  // Retry after a delay if an error occurs
+            });
+  }
+  document.getElementById('rematchButton').addEventListener('click', function() {
+    // Disable the button and add loading visual
+    this.disabled = true;
+    this.classList.add('loading');
+    this.textContent = 'Waiting...';
+
+    // Send the POST request to the server
+    fetch('/rematch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: gameMode
+    })
+            .then(response => response.text())
+            .then(data => {
+              if(data.startsWith('http')) {
+                window.location.replace(data);
+              }
+              else if(data === 'timeout'){
+                showGameResult('Time for rematch has expired');
+              }
+              else if(data === 'playerLeft'){
+                showGameResult('Opponent Left');
+              }
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              // Reset the button if there is an error
+              this.textContent = 'Rematch?';
+              this.classList.remove('loading');
+              this.disabled = false;
+            });
+  });
+  document.getElementById('menuButton').addEventListener('click', function() {
+    // Send the POST request to the server
+    fetch('/getMenu', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: 'playerLeft'
+    })
+            .then(response => response.text())
+            .then(data => {
+                window.location.replace(data);
+            })
+            .catch(error => {
+              console.error('Error:', error);
+            });
+  });
+
+  //To display result when someone wins,lose or its a draw
+  function showGameResult(result) {
+    const resultElement = document.getElementById('gameResult');
+    const rematchButton = document.getElementById('rematchButton');
+    resultElement.textContent = result;
+    resultElement.style.display = 'block'; // Show the result label
+    rematchButton.style.display = 'block'; // Show the rematch button
+  }
+  function displayOpponentLeft() {
+    const opponentLeftLabel = document.getElementById('opponentLeft');
+    opponentLeftLabel.textContent = 'Opponent Left!!';
+    opponentLeftLabel.style.display = 'block';  // Make the label visible
+
+    // Optionally, hide or disable other multiplayerGame controls
+    document.getElementById('rematchButton').style.display = 'none';
+    document.querySelectorAll('.board button').forEach(button => {
+      button.disabled = true;  // Disable board buttons if the multiplayerGame is over
+    });
+  }
+  //Function to disable or enable buttons based on whos turn
+  function setButtonsEnabled(enabled) {
+    document.querySelectorAll('.board button').forEach(button => {
+      if (enabled && button.textContent !== 'X' && button.textContent !== 'O') {
+        button.classList.remove('disabled');
+        button.disabled = false;
+        console.log('BUTTON ENABLED')
+      } else {
+        button.classList.add('disabled');
+        button.disabled = true;
+        console.log('BUTTON DISABLED')
+      }
+    });
+  }
+  //To update the button after player make a move
+  function updateBoardButtons(value, letter) {
+    const buttonToUpdate = document.querySelector(`button[value="${value}"]`);
+    if (buttonToUpdate) {
+      buttonToUpdate.textContent = letter;  // Set the button text to X or O
+      buttonToUpdate.disabled = true;       // Disable the button
+      buttonToUpdate.classList.add('played');  // Add 'played' class for styling
+    }
+  }
+  //To update the display of who's turn it is
+  function updateTurnDisplay(isMyTurn) {
+    const turnInfo = document.getElementById('turnInfo');
+    if (isMyTurn) {
+      turnInfo.textContent = "It's your turn!";
+    } else {
+      turnInfo.textContent = "It's " + opponentsName + "'s Turn!";
+    }
+    turnInfo.style.display = 'block';
+  }
+  //Function for extracting cookie
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+</script>
+
+</body>
+</html>

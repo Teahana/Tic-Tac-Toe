@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+        .login-container h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #0084ff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #006ae0;
+        }
+    </style>
+</head>
+<body>
+<div class="login-container">
+    <h2>Welcome to Tic-Tac-Toe!</h2>
+    <form id="loginForm">
+        <input type="text" id="username" name="username" placeholder="Enter your username" required>
+        <button type="submit">Start Game</button>
+        <div id="error" style="color: red; display: none;">Username Already Taken</div>  <!-- Hidden Error Message -->
+    </form>
+</div>
+<script>
+    //Function to extract cookie that is used for session purposes
+    window.onload = function() {
+        const cookie = getCookie('new');
+        console.log('Cookie value:', cookie)  // Output the cookie value to console for debugging
+    };
+
+    // Add event listener for form submission to handle authentication
+    document.getElementById('loginForm').addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent the form from submitting in the traditional way
+
+        const username = document.getElementById('username').value; // Get the username from the input field
+
+        // Send a POST request to the /auth endpoint with the username
+        fetch('/auth', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'  // Set content type as plain text for the server to easily parse
+            },
+            body: username  // Send username as plain text
+        })
+            .then(response => {
+                if(response.ok) {
+                    return response.text(); // Process the response if it's OK
+                }
+                throw new Error('Network response was not ok.');
+            })
+            .then(data => {
+                if(data === 'taken'){
+                    document.getElementById('error').style.display = 'block'; // Show error message if username is taken
+                }
+                else{
+                    window.location.replace(data); // Redirect to the game URL provided by the server
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    });
+
+    // Function to retrieve cookie value by name
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') { // Ensure document has cookies
+            const cookies = document.cookie.split(';'); // Split document cookie at semicolons
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim(); // Trim whitespace from the cookie string
+                // Check if this cookie string begins with the name we want
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); // Decode and return the cookie value
+                    break;
+                }
+            }
+        }
+        return cookieValue; // Return the cookie value or null if not found
+    }
+</script>
+</body>
+</html>

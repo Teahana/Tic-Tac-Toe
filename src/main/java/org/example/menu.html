@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding-top: 50px;
+        }
+        .button {
+            background-color: #4CAF50; /* Green */
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        #responseText {
+            padding: 20px;
+            font-size: 20px;
+            color: #333;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<button id="singlePlayButton" class="button">Single Player</button>
+<button id="playButton" class="button">Play</button>
+<button id="chatButton" class="button">Chat</button>
+<button id="signOutButton" class="button">Sign Out</button> <!-- Sign Out Button -->
+<div id="responseText">Click "Play" to start the game!</div>
+
+<script>
+    // Initialize and check if user session cookie is present
+    window.onload = function() {
+        const cookie = getCookie('new');
+        console.log('Cookie: ' + cookie); // Log cookie for debugging
+    };
+
+    // Handle Play button click events
+    document.getElementById('playButton').onclick = function() {
+        document.getElementById('responseText').innerText = "Waiting in Queue...";
+        fetch('/play', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain',
+                'Cache-Control': 'no-cache',
+            },
+            body: "Play"
+        })
+            .then(response => response.text())
+            .then(data => {
+                if(data.startsWith("http")) {
+                    window.location.replace(data); // Redirect if response is a URL
+                } else {
+                    document.getElementById('responseText').innerText = data; // Display response
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('responseText').innerText = "Failed to connect. Please try again!";
+            });
+    };
+
+    // Event listener for the Chat button
+    document.getElementById('chatButton').addEventListener('click', function() {
+        window.location.href = 'chat'; // Redirect to chat page
+    });
+
+    // Event listener for the Sign Out button
+    document.getElementById('signOutButton').addEventListener('click', function() {
+        fetch('/signOut', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain',
+                'Cache-Control': 'no-cache',
+            },
+            body: "Sign Out"
+        })
+            .then(response => response.text())
+            .then(data => {
+                if(data === 'signOut'){
+                    localStorage.clear(); // Clear local storage that was used for chat
+                    window.location.replace('/auth'); // Redirect to auth page
+                } else {
+                    document.getElementById('responseText').innerText = data; // Display error message
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('responseText').innerText = "Failed to sign out. Please try again!";
+            });
+    });
+
+    // Handling Single Player button events
+    document.getElementById('singlePlayButton').addEventListener('click', function() {
+        fetch('/playSingle', { // POST request to initiate a single player game
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: 'Start Game'
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                window.location.replace(data); // Redirect to the game page
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('responseOutput').innerText = 'Failed to start the game. Please try again!';
+            });
+    });
+
+    // Retrieve a cookie value by name
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); // Decode and return the cookie value
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+</body>
+</html>
